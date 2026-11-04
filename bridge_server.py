@@ -11,12 +11,12 @@ import subprocess
 import time
 import urllib.parse
 import urllib.request
-import zipfile
+import tempfile, zipfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 JVIEWER_PROC = None
-WORK_DIR = "/tmp/megarac_jviewer"
-JVIEWER_LOG_PATH = "/tmp/megarac_jviewer/jviewer.log"
+WORK_DIR = os.path.join(tempfile.gettempdir(), "megarac_jviewer")
+JVIEWER_LOG_PATH = os.path.join(WORK_DIR, "jviewer.log")
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
