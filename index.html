@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MegaRAC Commander — Unified HTML5 iKVM &amp; IPMI 2.0 Control Center</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #070a12;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#070a12] text-slate-100">
+
+  <!-- Top Header & Live BMC Connection Bar -->
+  <header class="sticky top-0 z-30 border-b border-slate-800/90 bg-slate-900/95 backdrop-blur">
+    <div class="max-w-[1600px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-base tracking-tight text-white">MegaRAC Commander</span>
+            <span id="connStatusBadge" class="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5">
+              <span id="connStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span id="connStatusText">Disconnected</span>
+            </span>
+            <span id="fwBadge" class="hidden text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"></span>
+            <span id="hostPowerBadge" class="hidden text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700"></span>
+            <span id="jviewerTelemetryBadge" class="hidden text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"></span>
+          </div>
+          <p class="text-[11px] text-slate-400">Unified Chromeless iKVM + Extracted JViewer Controls + Full IPMI 2.0 Suite</p>
+        </div>
+      </div>
+
+      <form id="bmcConnectForm" class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs focus-within:border-cyan-500">
+          <span class="text-slate-400 mr-1.5">BMC IP:</span>
+          <input id="bmcHostInput" type="text" placeholder="192.168.1.x" required aria-label="BMC IP Address" class="bg-transparent font-mono text-cyan-300 w-28 focus:outline-none" />
+        </div>
+        <div class="flex items-center bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs focus-within:border-cyan-500">
+          <span class="text-slate-400 mr-1.5">User:</span>
+          <input id="ipmiUserInput" type="text" value="admin" required aria-label="IPMI Username" class="bg-transparent font-mono text-slate-200 w-16 focus:outline-none" />
+        </div>
+        <div class="flex items-center bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs focus-within:border-cyan-500">
+          <span class="text-slate-400 mr-1.5">Pass:</span>
+          <input id="ipmiPassInput" type="password" value="admin" required aria-label="IPMI Password" class="bg-transparent font-mono text-slate-200 w-20 focus:outline-none" />
+        </div>
+        <select id="ipmiCipherSelect" aria-label="IPMI Interface & Cipher" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-500">
+          <option value="auto">Auto Cipher</option>
+          <option value="lanplus_default">lanplus</option>
+          <option value="lanplus_c3">lanplus -C 3</option>
+          <option value="lanplus_c17">lanplus -C 17</option>
+          <option value="lanplus_c0">lanplus -C 0</option>
+          <option value="lan_v15">lan (v1.5)</option>
+        </select>
+        <button id="connectBmcBtn" type="submit" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition shadow-lg shadow-cyan-500/20">
+          <span id="connectBtnLabel">Connect &amp; Launch</span>
+        </button>
+        <button id="uidToggleBtn" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Toggle Chassis UID LED">
+          UID LED
+        </button>
+        <button id="quickCliDrawerBtn" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition">
+          &gt;_ CLI (<span id="cliCountBadge">0</span>)
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <!-- Error / Diagnostic Banner -->
+  <div id="errorAlertBox" class="hidden max-w-[1600px] w-full mx-auto px-4 pt-3">
+    <div class="bg-rose-950/60 border border-rose-500/40 rounded-xl p-3.5 space-y-2">
+      <div class="flex items-center justify-between">
+        <span id="errorAlertTitle" class="text-xs font-bold uppercase tracking-wider text-rose-300">Diagnostic Notice</span>
+        <button id="dismissErrorBtn" type="button" class="text-xs font-mono text-rose-300 hover:text-white">Dismiss</button>
+      </div>
+      <pre id="errorAlertDetails" class="text-xs font-mono text-rose-200 bg-black/40 p-2.5 rounded-lg overflow-x-auto whitespace-pre-wrap"></pre>
+    </div>
+  </div>
+
+  <!-- ==================== UNIFIED SIDE-BY-SIDE WORKSPACE ==================== -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 py-4">
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+
+      <!-- ==================== LEFT 7 COLS: MODERNIZED CHROMELESS iKVM STAGE ==================== -->
+      <div id="kvmStageColumn" class="xl:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+
+        <!-- Modern Top JViewer Native Control Bar -->
+        <div class="p-2.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button id="startKvmSessionBtn" type="button" class="px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Start / Sync iKVM</span>
+            </button>
+
+            <div class="inline-flex rounded-lg bg-slate-900 border border-slate-800 p-0.5">
+              <button type="button" data-jvclick="Pause" class="jv-native-btn px-2 py-1 rounded text-[11px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white" title="Invoke JViewer Video -> Pause Redirection">Pause</button>
+              <button type="button" data-jvclick="Resume" class="jv-native-btn px-2 py-1 rounded text-[11px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white" title="Invoke JViewer Video -> Resume Redirection">Resume</button>
+              <button type="button" data-jvclick="Refresh" class="jv-native-btn px-2 py-1 rounded text-[11px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white" title="Invoke JViewer Video -> Refresh Video">Refresh</button>
+            </div>
+
+            <div class="inline-flex rounded-lg bg-slate-900 border border-slate-800 p-0.5">
+              <button type="button" data-jvclick="Sync" class="jv-native-btn px-2 py-1 rounded text-[11px] font-medium text-cyan-300 hover:bg-slate-800" title="Invoke JViewer Mouse -> Synchronize Cursor">Sync Cursor</button>
+              <button type="button" data-jvclick="Absolute" class="jv-native-btn px-2 py-1 rounded text-[11px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white" title="Invoke JViewer Mouse -> Absolute Mouse Mode">Abs Mouse</button>
+              <button type="button" data-jvclick="Relative" class="jv-native-btn px-2 py-1 rounded text-[11px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white" title="Invoke JViewer Mouse -> Relative Mouse Mode">Rel Mouse</button>
+            </div>
+
+            <button type="button" data-jvclick="Media" class="jv-native-btn px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30" title="Open JViewer Native Virtual Media Wizard">
+              Virtual Media
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <label class="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900 border border-slate-800 px-2 py-1 rounded-lg cursor-pointer" title="Hides JViewer's dated 2012 Swing menu bar and toolbar so only the video canvas is shown">
+              <input id="chromelessToggle" type="checkbox" checked class="rounded bg-slate-800 border-slate-600 text-cyan-500" />
+              <span>Chromeless UI</span>
+            </label>
+            <button id="expandKvmStageBtn" type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700" title="Toggle Wide Theatre Layout">
+              Wide View
+            </button>
+            <button id="fullscreenKvmBtn" type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
+              Fullscreen
+            </button>
+          </div>
+        </div>
+
+        <!-- Dynamic Extracted JViewer Native Menus Ribbon -->
+        <div id="extractedMenusRibbon" class="px-3 py-1.5 bg-slate-900/90 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex flex-wrap items-center gap-1.5" id="dynamicJviewerMenuButtons">
+            <span class="text-[11px] font-mono text-slate-400">Extracted JViewer Menus:</span>
+            <span class="text-[11px] text-slate-500 italic">Launch iKVM to auto-extract live menus from your BMC's JViewer.jar</span>
+          </div>
+          <button id="syncJviewerMenusBtn" type="button" class="text-[11px] font-mono text-cyan-400 hover:text-cyan-300">
+            ↻ Sync JViewer State
+          </button>
+        </div>
+
+        <!-- Borderless HTML5 Video Stream Container -->
+        <div id="kvmContainerArea" class="relative bg-black min-h-[490px] flex flex-col items-center justify-center">
+          <div id="kvmPlaceholder" class="max-w-lg text-center p-6 space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-cyan-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            <h3 class="text-sm font-bold text-white">Chromeless HTML5 iKVM Console</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Enter your BMC IP above and click <strong>"Connect &amp; Launch"</strong> (or <strong>"Start / Sync iKVM"</strong>). <code class="text-slate-300">ModernJViewerBridge</code> will launch your BMC's <code class="text-slate-300">JViewer.jar</code> in OpenJDK 8, strip away its legacy Java Swing chrome, extract its menus into the modern toolbar above, and stream the clean video surface right here.
+            </p>
+          </div>
+          <iframe id="noVncIframe" src="about:blank" title="MegaRAC Chromeless iKVM Video" class="hidden w-full h-[520px] border-0 bg-black"></iframe>
+        </div>
+
+        <!-- Bottom Modern HID Macro, Modifier Hold & Auto-Typer Bar -->
+        <div class="p-2.5 bg-slate-950 border-t border-slate-800 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="text-[11px] font-mono text-slate-400 mr-1">Keys:</span>
+              <button type="button" data-xkey="F2" class="xkey-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-200 border border-slate-700">F2 BIOS</button>
+              <button type="button" data-xkey="Delete" class="xkey-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-200 border border-slate-700">DEL</button>
+              <button type="button" data-xkey="F11" class="xkey-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-200 border border-slate-700">F11 Boot</button>
+              <button type="button" data-xkey="F12" class="xkey-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-200 border border-slate-700">F12 PXE</button>
+              <button type="button" data-xkey="F10" class="xkey-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-200 border border-slate-700">F10 Save</button>
+              <button type="button" data-xkey="Escape" class="xkey-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-200 border border-slate-700">ESC</button>
+              <button type="button" data-jvclick="Ctrl+Alt+Del" data-xkey="ctrl+alt+Delete" class="xkey-btn px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-[11px] font-mono text-rose-300 border border-rose-500/30">Ctrl+Alt+Del</button>
+              <button type="button" data-jvclick="Right Ctrl" class="jv-native-btn px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[11px] font-mono text-amber-300 border border-slate-800" title="JViewer Hold Right Ctrl Key">Hold R-Ctrl</button>
+              <button type="button" data-jvclick="Left Alt" class="jv-native-btn px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[11px] font-mono text-amber-300 border border-slate-800" title="JViewer Hold Left Alt Key">Hold L-Alt</button>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <span class="text-[11px] font-mono text-slate-400 mr-1">Power:</span>
+              <button type="button" data-power="on" class="power-action-btn px-2 py-1 rounded text-[11px] font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30">On</button>
+              <button type="button" data-power="soft" class="power-action-btn px-2 py-1 rounded text-[11px] font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30">Soft Off</button>
+              <button type="button" data-power="cycle" class="power-action-btn px-2 py-1 rounded text-[11px] font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30">Cycle</button>
+              <button type="button" data-power="reset" class="power-action-btn px-2 py-1 rounded text-[11px] font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30">Reset</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1 border-t border-slate-800/70">
+            <span class="text-[11px] font-mono text-cyan-400 whitespace-nowrap">Paste to KVM:</span>
+            <input id="xtypeInput" type="text" placeholder="Paste root password or shell command to type directly into console..." aria-label="Paste text to console" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500" />
+            <button id="sendXtypeBtn" type="button" class="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs whitespace-nowrap">
+              Type String
+            </button>
+            <button id="reloadIframeBtn" type="button" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 whitespace-nowrap" title="Reload Video Stream">
+              ↻ Stream
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== RIGHT 5 COLS: INTEGRATED IPMI & JVIEWER CONTROL DOCK ==================== -->
+      <div id="controlDockColumn" class="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+
+        <!-- Dock Sub-Navigation Tabs -->
+        <div class="bg-slate-950 border-b border-slate-800 px-3 pt-2 flex items-center gap-1 overflow-x-auto">
+          <button type="button" data-dock="fans" class="dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-cyan-400 text-cyan-300 whitespace-nowrap">
+            Fan Speed &amp; PWM
+          </button>
+          <button type="button" data-dock="boot" class="dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+            Boot Order &amp; BIOS
+          </button>
+          <button type="button" data-dock="sensors" class="dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+            Live SDR Sensors
+          </button>
+          <button type="button" data-dock="jvmenus" class="dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+            Extracted JViewer Menu
+          </button>
+          <button type="button" data-dock="raw" class="dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+            Raw IPMI &amp; SEL
+          </button>
+          <button type="button" data-dock="overview" class="dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+            BMC Info
+          </button>
+        </div>
+
+        <!-- ==================== DOCK 1: FAN SPEED & PWM UNLOCKER ==================== -->
+        <div id="dock-fans" class="dock-panel p-4 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-white">OEM Raw Fan Speed &amp; PWM Unlocker</h2>
+              <p class="text-[11px] text-slate-400">Adjust fan duty cycles while monitoring live temperatures &amp; console</p>
+            </div>
+            <select id="fanOemProfileSelect" aria-label="OEM Fan Dialect" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-cyan-300">
+              <option value="asrock_3a">ASRock Rack (0x3a 0x01)</option>
+              <option value="ami_30">AMI / Supermicro / Tyan (0x30 0x70)</option>
+              <option value="asrock_d8">ASRock Extended (0x3a 0xd8)</option>
+              <option value="dell_30">Dell / Quanta / Cloudline (0x30 0x30)</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-5 gap-1.5">
+            <button type="button" data-fanpreset="25" class="fan-preset-btn py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30">25% Quiet</button>
+            <button type="button" data-fanpreset="40" class="fan-preset-btn py-1.5 rounded-lg text-xs font-medium bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30">40% Norm</button>
+            <button type="button" data-fanpreset="65" class="fan-preset-btn py-1.5 rounded-lg text-xs font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30">65% Cool</button>
+            <button type="button" data-fanpreset="100" class="fan-preset-btn py-1.5 rounded-lg text-xs font-medium bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30">100% Max</button>
+            <button type="button" data-fanpreset="auto" class="fan-preset-btn py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">BMC Auto</button>
+          </div>
+
+          <div id="fanZoneSlidersContainer" class="space-y-2"></div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <code id="fanRawPreview" class="text-[11px] font-mono text-emerald-300 truncate">ipmitool raw 0x3a 0x01 ...</code>
+              <button id="applyFanRawBtn" type="button" class="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs whitespace-nowrap">
+                Apply PWM
+              </button>
+            </div>
+            <pre id="fanExecResult" class="hidden text-[11px] font-mono text-slate-300 border-t border-slate-800 pt-1.5 whitespace-pre-wrap"></pre>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">Live Fan Tachometers (BMC SDR)</span>
+              <button id="probeFanRawBtn" type="button" class="text-[11px] font-mono text-cyan-400 hover:text-cyan-300">↻ Poll RPMs</button>
+            </div>
+            <div id="liveFanSensorsBox" class="font-mono text-xs text-slate-400 space-y-1.5">
+              Connect to BMC to view live RPM readings.
+            </div>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="text-xs font-semibold text-amber-400">Low-RPM Sensor Threshold Fix (Anti-Surge)</div>
+            <div class="flex gap-2">
+              <input id="threshFanNameInput" type="text" placeholder="Sensor (e.g. CPU_FAN1)" class="w-1/2 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs font-mono text-slate-200" />
+              <input id="threshFanRpmInput" type="text" value="100 150 200" placeholder="LNR LCR LNC" class="w-1/2 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs font-mono text-cyan-300" />
+            </div>
+            <button id="applyThreshFixBtn" type="button" class="w-full py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30">
+              Set Lower Fan Thresholds
+            </button>
+          </div>
+        </div>
+
+        <!-- ==================== DOCK 2: BOOT ORDER & BIOS FLAGS ==================== -->
+        <div id="dock-boot" class="dock-panel hidden p-4 space-y-4">
+          <div>
+            <h2 class="text-sm font-bold text-white">Boot Device Override &amp; BIOS Flags</h2>
+            <p class="text-[11px] text-slate-400">Set next boot target (`chassis bootdev`) and watch POST live on the left</p>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button type="button" data-bootdev="disk" class="boot-dev-card p-2.5 rounded-xl border border-cyan-500 bg-cyan-500/10 text-left">
+              <div class="font-mono text-xs font-bold text-cyan-300">disk</div>
+              <div class="text-xs font-semibold text-white">Local HDD/NVMe</div>
+            </button>
+            <button type="button" data-bootdev="bios" class="boot-dev-card p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left">
+              <div class="font-mono text-xs font-bold text-slate-400">bios</div>
+              <div class="text-xs font-semibold text-white">Enter BIOS Setup</div>
+            </button>
+            <button type="button" data-bootdev="pxe" class="boot-dev-card p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left">
+              <div class="font-mono text-xs font-bold text-slate-400">pxe</div>
+              <div class="text-xs font-semibold text-white">Network PXE</div>
+            </button>
+            <button type="button" data-bootdev="cdrom" class="boot-dev-card p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left">
+              <div class="font-mono text-xs font-bold text-slate-400">cdrom</div>
+              <div class="text-xs font-semibold text-white">Virtual CD / ISO</div>
+            </button>
+            <button type="button" data-bootdev="floppy" class="boot-dev-card p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left">
+              <div class="font-mono text-xs font-bold text-slate-400">floppy</div>
+              <div class="text-xs font-semibold text-white">USB Key / Floppy</div>
+            </button>
+            <button type="button" data-bootdev="none" class="boot-dev-card p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left">
+              <div class="font-mono text-xs font-bold text-slate-400">none</div>
+              <div class="text-xs font-semibold text-white">Normal Order</div>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer text-xs">
+              <input id="bootFlagEfi" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-cyan-500" />
+              <span>UEFI (<code class="text-cyan-300">efiboot</code>)</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer text-xs">
+              <input id="bootFlagPersistent" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-cyan-500" />
+              <span>Persistent</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer text-xs">
+              <input id="bootFlagCmos" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-cyan-500" />
+              <span>Clear CMOS</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer text-xs">
+              <input id="bootFlagVerbose" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-cyan-500" />
+              <span>Verbose POST</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="applyBootBtn" type="button" class="py-2 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950">
+              Set Boot Override
+            </button>
+            <button id="applyBootRebootBtn" type="button" class="py-2 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950">
+              Set &amp; Reboot Server Now
+            </button>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">Active BMC Parameter 5 State</span>
+              <button id="readBootParamBtn" type="button" class="text-[11px] font-mono text-cyan-400 hover:text-cyan-300">↻ Read</button>
+            </div>
+            <pre id="liveBootParamOutput" class="text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre-wrap">Connect to BMC to read `chassis bootparam get 5`.</pre>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+            <span class="text-xs font-semibold text-white">AC Power Restore Policy (`chassis policy`)</span>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-policy="always-on" class="ac-policy-btn py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-900 hover:border-cyan-500 text-slate-200">always-on</button>
+              <button type="button" data-policy="previous" class="ac-policy-btn py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-900 hover:border-cyan-500 text-slate-200">previous</button>
+              <button type="button" data-policy="always-off" class="ac-policy-btn py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-900 hover:border-cyan-500 text-slate-200">always-off</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== DOCK 3: LIVE SDR SENSORS ==================== -->
+        <div id="dock-sensors" class="dock-panel hidden p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <input id="sensorFilterInput" type="text" placeholder="Filter sensors (Temp, Fan, V)..." aria-label="Filter sensors" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500" />
+            <button id="pollSdrBtn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950">
+              Poll SDR
+            </button>
+          </div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden max-h-[470px] overflow-y-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
+                  <th class="py-2 px-3">Sensor</th>
+                  <th class="py-2 px-2">Status</th>
+                  <th class="py-2 px-3 text-right">Reading</th>
+                </tr>
+              </thead>
+              <tbody id="sdrTableBody" class="divide-y divide-slate-800/70 font-mono text-[11px]">
+                <tr><td colspan="3" class="py-8 text-center text-slate-500">Connect to BMC to load live hardware sensors.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ==================== DOCK 4: EXTRACTED JVIEWER MENU & REFLECTION INSPECTOR ==================== -->
+        <div id="dock-jvmenus" class="dock-panel hidden p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-white">Extracted `JViewer.jar` Native Commands</h2>
+              <p class="text-[11px] text-slate-400">Live Swing `JMenuBar` items &amp; reflected methods from your BMC's JAR</p>
+            </div>
+            <button id="refreshJvInspectorBtn" type="button" class="px-2.5 py-1 rounded-lg text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+              Refresh Tree
+            </button>
+          </div>
+
+          <div id="jvExtractedTreeContainer" class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5 max-h-[280px] overflow-y-auto text-xs">
+            <div class="text-slate-500 text-center py-6">Click "Start / Sync iKVM" to extract all menus and actions from your BMC's JViewer.jar.</div>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-mono uppercase text-cyan-400">JViewer Bridge &amp; OpenJDK 8 Output</span>
+              <div class="flex gap-2">
+                <button id="downloadLiveJnlpBtn" type="button" class="text-[11px] font-mono text-emerald-400 hover:underline">Export .jnlp</button>
+                <button id="openNoVncTabBtn" type="button" class="text-[11px] font-mono text-slate-400 hover:text-white">Pop Out :6080</button>
+              </div>
+            </div>
+            <pre id="kvmLaunchLog" class="text-[11px] font-mono text-emerald-300 max-h-40 overflow-y-auto whitespace-pre-wrap">Ready.</pre>
+          </div>
+        </div>
+
+        <!-- ==================== DOCK 5: RAW IPMI STUDIO & SEL LOG ==================== -->
+        <div id="dock-raw" class="dock-panel hidden p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-white">Live `ipmitool` Runner</span>
+            <select id="rawPresetSelect" aria-label="Preset IPMI Command" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-mono text-cyan-300">
+              <option value="raw 0x06 0x01">raw 0x06 0x01 (Device ID)</option>
+              <option value="raw 0x3a 0xd9">raw 0x3a 0xd9 (ASRock Fan Duty)</option>
+              <option value="raw 0x30 0x45 0x00">raw 0x30 0x45 0x00 (AMI Fan Mode)</option>
+              <option value="lan print 1">lan print 1 (Network)</option>
+              <option value="user list 1">user list 1 (Users)</option>
+              <option value="fru print">fru print (FRU Info)</option>
+              <option value="sol info 1">sol info 1 (SOL Config)</option>
+            </select>
+          </div>
+          <form id="customIpmiForm" class="flex gap-2">
+            <input id="customIpmiInput" type="text" value="raw 0x06 0x01" aria-label="IPMI Arguments" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300" />
+            <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950">Execute</button>
+          </form>
+          <pre id="customIpmiOutput" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-cyan-300 max-h-44 overflow-y-auto whitespace-pre-wrap">Output appears here.</pre>
+
+          <div class="border-t border-slate-800 pt-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">System Event Log (`sel elist`)</span>
+              <div class="flex gap-1.5">
+                <button id="refreshSelBtn" type="button" class="px-2 py-0.5 rounded text-[11px] bg-slate-800 text-cyan-300">Refresh</button>
+                <button id="clearSelBtn" type="button" class="px-2 py-0.5 rounded text-[11px] bg-rose-500/20 text-rose-300">Clear</button>
+              </div>
+            </div>
+            <pre id="selLogOutput" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap">Connect to BMC to view SEL entries.</pre>
+          </div>
+        </div>
+
+        <!-- ==================== DOCK 6: BMC INFO & PORT PROBE ==================== -->
+        <div id="dock-overview" class="dock-panel hidden p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Controller Info (`mc info` &amp; `chassis status`)</span>
+            <button id="refreshOverviewBtn" type="button" class="px-2.5 py-1 rounded text-[11px] bg-slate-800 text-cyan-300">Refresh</button>
+          </div>
+          <pre id="mcInfoOutput" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-emerald-300 max-h-48 overflow-y-auto whitespace-pre-wrap">Not connected yet.</pre>
+          <pre id="chassisStatusOutput" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-cyan-300 max-h-36 overflow-y-auto whitespace-pre-wrap">Waiting for BMC connection...</pre>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-300">TCP / UDP Port Reachability Probe</span>
+              <button id="runProbeBtn" type="button" class="px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">Probe Ports</button>
+            </div>
+            <pre id="probeResultsBox" class="text-[11px] font-mono text-slate-400 bg-slate-950 border border-slate-800 rounded-xl p-2.5 whitespace-pre-wrap">Checks TCP 80, 443, 7578, 5120 &amp; UDP 623.</pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Executed Command History Drawer -->
+  <div id="cliDrawerModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white">Live Executed IPMItool &amp; JViewer Command Log</h3>
+        <button id="closeCliDrawerBtn" type="button" class="text-slate-400 hover:text-white text-xs font-mono">Close</button>
+      </div>
+      <pre id="cliHistoryPre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-emerald-300 max-h-80 overflow-y-auto whitespace-pre-wrap"></pre>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toastBox" class="fixed bottom-4 right-4 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-900/95 border border-cyan-500/50 text-xs font-medium text-cyan-200 shadow-2xl flex items-center gap-2">
+    <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+    <span id="toastMsg"></span>
+  </div>
+
+  <script>
+    const state = {
+      connected: false,
+      jviewerStarted: false,
+      wideMode: false,
+      uidActive: false,
+      oemFanProfile: 'asrock_3a',
+      fanAutoMode: false,
+      fanZones: [
+        { label: 'Header 1 (CPU_1)', duty: 40 },
+        { label: 'Header 2 (CPU_2)', duty: 40 },
+        { label: 'Header 3 (REAR_1)', duty: 40 },
+        { label: 'Header 4 (FRONT_1)', duty: 40 },
+        { label: 'Header 5 (FRONT_2)', duty: 40 }
+      ],
+      bootDevice: 'disk',
+      sdrList: [],
+      jvItems: [],
+      jvMethods: [],
+      cliHistory: []
+    };
+
+    function getApiBase() {
+      if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        return window.location.origin;
+      }
+      return 'http://127.0.0.1:8765';
+    }
+
+    function getNoVncUrl() {
+      const host = window.location.hostname || 'localhost';
+      const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      return `${proto}//${host}:6080/vnc_clean.html?autoconnect=true&resize=scale&reconnect=true&reconnect_delay=1000`;
+    }
+
+    function getCreds() {
+      return {
+        host: document.getElementById('bmcHostInput').value.trim(),
+        user: document.getElementById('ipmiUserInput').value.trim() || 'admin',
+        password: document.getElementById('ipmiPassInput').value,
+        cipher: document.getElementById('ipmiCipherSelect').value
+      };
+    }
+
+    try {
+      const savedHost = localStorage.getItem('megarac_host');
+      const savedUser = localStorage.getItem('megarac_user');
+      if (savedHost) document.getElementById('bmcHostInput').value = savedHost;
+      if (savedUser) document.getElementById('ipmiUserInput').value = savedUser;
+    } catch (e) {}
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      document.getElementById('toastMsg').textContent = msg;
+      box.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => box.classList.add('hidden'), 3200);
+    }
+
+    function showErrorBanner(title, details) {
+      document.getElementById('errorAlertTitle').textContent = title;
+      document.getElementById('errorAlertDetails').textContent = details;
+      document.getElementById('errorAlertBox').classList.remove('hidden');
+    }
+
+    document.getElementById('dismissErrorBtn').addEventListener('click', () => {
+      document.getElementById('errorAlertBox').classList.add('hidden');
+    });
+
+    async function callBridge(payload) {
+      const creds = getCreds();
+      if (!creds.host) {
+        showErrorBanner('Missing BMC IP Address', 'Enter your MegaRAC SP BMC IP address in the top bar first.');
+        return { ok: false, stderr: 'Missing BMC IP' };
+      }
+      try {
+        localStorage.setItem('megarac_host', creds.host);
+        localStorage.setItem('megarac_user', creds.user);
+      } catch (e) {}
+
+      const reqBody = Object.assign({}, creds, payload);
+      try {
+        const resp = await fetch(getApiBase() + '/api/ipmi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody)
+        });
+        const data = await resp.json();
+        if (data.cmd) {
+          state.cliHistory.push(`$ ${data.cmd}\n${data.stdout || data.stderr || '(OK)'}`);
+          document.getElementById('cliCountBadge').textContent = String(state.cliHistory.length);
+        }
+        return data;
+      } catch (err) {
+        const msg = `Could not reach bridge server at ${getApiBase()}/api/ipmi (${err.message}).`;
+        showErrorBanner('Bridge Server Unreachable', msg);
+        return { ok: false, stderr: msg };
+      }
+    }
+
+    // ==================== DOCK TAB SWITCHING ====================
+    document.querySelectorAll('.dock-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-dock');
+        document.querySelectorAll('.dock-tab').forEach(b => {
+          const active = b.getAttribute('data-dock') === target;
+          b.className = active
+            ? 'dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-cyan-400 text-cyan-300 whitespace-nowrap'
+            : 'dock-tab px-3 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap';
+        });
+        document.querySelectorAll('.dock-panel').forEach(p => {
+          p.classList.toggle('hidden', p.id !== `dock-${target}`);
+        });
+      });
+    });
+
+    // ==================== CONNECT & LAUNCH UNIFIED SESSION ====================
+    async function connectAndSyncBmc(e) {
+      if (e) e.preventDefault();
+      const creds = getCreds();
+      if (!creds.host) {
+        showErrorBanner('BMC IP Required', 'Enter your MegaRAC SP IP address in the top bar.');
+        return;
+      }
+
+      document.getElementById('errorAlertBox').classList.add('hidden');
+      document.getElementById('connectBtnLabel').textContent = 'Syncing...';
+      document.getElementById('connStatusText').textContent = 'Connecting...';
+      document.getElementById('connStatusDot').className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+
+      launchJviewerSession();
+
+      const res = await callBridge({ action: 'sync_all' });
+      document.getElementById('connectBtnLabel').textContent = 'Connect & Launch';
+
+      if (!res.ok) {
+        state.connected = false;
+        document.getElementById('connStatusText').textContent = 'IPMI Error';
+        document.getElementById('connStatusDot').className = 'w-2 h-2 rounded-full bg-rose-500';
+        showErrorBanner(`IPMI Connection Error (${creds.host})`, res.diagnostics || res.stderr || 'Unknown error');
+        return;
+      }
+
+      state.connected = true;
+      document.getElementById('connStatusText').textContent = `Connected (${res.used_interface})`;
+      document.getElementById('connStatusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      document.getElementById('connStatusBadge').className =
+        'text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5';
+
+      document.getElementById('mcInfoOutput').textContent = res.mc_info || 'No output';
+      const fwMatch = (res.mc_info || '').match(/Firmware Revision\s*:\s*([^\n]+)/i);
+      if (fwMatch) {
+        const fwEl = document.getElementById('fwBadge');
+        fwEl.textContent = `FW ${fwMatch[1].trim()}`;
+        fwEl.classList.remove('hidden');
+      }
+
+      document.getElementById('chassisStatusOutput').textContent = res.chassis_status || 'No output';
+      const pwrOn = /System Power\s*:\s*on/i.test(res.chassis_status || '');
+      const pwrBadge = document.getElementById('hostPowerBadge');
+      pwrBadge.classList.remove('hidden');
+      pwrBadge.textContent = pwrOn ? 'POWER: ON' : 'POWER: OFF';
+      pwrBadge.className = pwrOn
+        ? 'text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+        : 'text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30';
+
+      parseAndRenderSdr(res.sdr_raw || '');
+      if (res.boot_param) document.getElementById('liveBootParamOutput').textContent = res.boot_param;
+      if (res.sel_raw) document.getElementById('selLogOutput').textContent = res.sel_raw;
+
+      showToast(`Synced IPMI & started iKVM for ${creds.host}`);
+    }
+
+    // ==================== CHROMELESS JVIEWER LAUNCH & MENU EXTRACTION ====================
+    function attachNoVncIframe() {
+      const iframe = document.getElementById('noVncIframe');
+      iframe.src = getNoVncUrl();
+      iframe.classList.remove('hidden');
+      document.getElementById('kvmPlaceholder').classList.add('hidden');
+    }
+
+    async function launchJviewerSession() {
+      const logEl = document.getElementById('kvmLaunchLog');
+      logEl.textContent = 'Starting ModernJViewerBridge (OpenJDK 8 + Swing Menu Extractor)...';
+      attachNoVncIframe();
+
+      const res = await callBridge({ action: 'launch_jviewer_novnc' });
+      logEl.textContent = res.log || res.stderr || 'Launch completed.';
+      if (res.ok) {
+        state.jviewerStarted = true;
+        setTimeout(syncExtractedJviewerState, 1500);
+        setTimeout(syncExtractedJviewerState, 4000);
+      }
+    }
+
+    async function syncExtractedJviewerState() {
+      const res = await callBridge({ action: 'jviewer_state' });
+      if (!res.ok) return;
+
+      if (res.windowTitle) {
+        const badge = document.getElementById('jviewerTelemetryBadge');
+        badge.textContent = res.windowTitle;
+        badge.classList.remove('hidden');
+      }
+
+      state.jvItems = res.items || [];
+      state.jvMethods = res.methods || [];
+      renderExtractedJviewerControls();
+    }
+
+    function renderExtractedJviewerControls() {
+      const ribbon = document.getElementById('dynamicJviewerMenuButtons');
+      const treeBox = document.getElementById('jvExtractedTreeContainer');
+
+      if (!state.jvItems.length) {
+        treeBox.innerHTML = `
+          <div class="text-slate-400 space-y-2">
+            <div>Waiting for JViewer window to initialize menus... Click <strong>"Refresh Tree"</strong> in a moment.</div>
+            ${state.jvMethods.length ? `<div class="text-[11px] font-mono text-cyan-300 pt-2 border-t border-slate-800">Discovered ${state.jvMethods.length} JViewer classes/methods via Reflection:<br/>${state.jvMethods.slice(0, 18).join('<br/>')}</div>` : ''}
+          </div>`;
+        return;
+      }
+
+      const groups = {};
+      state.jvItems.forEach(item => {
+        const topCat = item.category.split(' > ')[0];
+        if (!groups[topCat]) groups[topCat] = [];
+        groups[topCat].push(item);
+      });
+
+      ribbon.innerHTML = '<span class="text-[11px] font-mono text-cyan-400 mr-1">JViewer Native:</span>';
+      Object.keys(groups).forEach(cat => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 text-[11px] font-medium text-slate-200 hover:text-cyan-300 border border-slate-700 transition';
+        btn.textContent = `${cat} (${groups[cat].length})`;
+        btn.addEventListener('click', () => {
+          document.querySelector('[data-dock="jvmenus"]').click();
+        });
+        ribbon.appendChild(btn);
+      });
+
+      treeBox.innerHTML = Object.keys(groups).map(cat => `
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 space-y-1.5">
+          <div class="text-[11px] font-mono uppercase text-cyan-400 font-semibold">${cat}</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${groups[cat].map(item => `
+              <button type="button" data-jvid="${item.id.replace(/"/g, '&quot;')}" class="jv-extracted-item-btn px-2 py-1 rounded text-[11px] font-mono border transition ${
+                item.selected
+                  ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500/40'
+                  : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }">
+                ${item.type !== 'action' ? (item.selected ? '✓ ' : '○ ') : ''}${item.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      treeBox.querySelectorAll('.jv-extracted-item-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-jvid');
+          const res = await callBridge({ action: 'jviewer_click', id });
+          if (res.ok) {
+            showToast(`JViewer Action: ${res.clicked || id}`);
+            setTimeout(syncExtractedJviewerState, 400);
+          }
+        });
+      });
+    }
+
+    document.querySelectorAll('.jv-native-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const target = btn.getAttribute('data-jvclick');
+        const res = await callBridge({ action: 'jviewer_click', id: target });
+        if (res.ok && res.clicked) {
+          showToast(`Triggered JViewer: ${res.clicked}`);
+          setTimeout(syncExtractedJviewerState, 400);
+        } else {
+          showToast(`Sent JViewer command: ${target}`);
+        }
+      });
+    });
+
+    document.getElementById('chromelessToggle').addEventListener('change', async (e) => {
+      const chromeless = e.target.checked;
+      await callBridge({ action: 'jviewer_chrome', chromeless });
+      showToast(chromeless ? 'Enabled Chromeless Video Mode' : 'Restored Classic Java Swing Menu Bar');
+    });
+
+    document.getElementById('syncJviewerMenusBtn').addEventListener('click', syncExtractedJviewerState);
+    document.getElementById('refreshJvInspectorBtn').addEventListener('click', async () => {
+      await syncExtractedJviewerState();
+      const logRes = await callBridge({ action: 'jviewer_logs' });
+      if (logRes.log) document.getElementById('kvmLaunchLog').textContent = logRes.log;
+    });
+
+    document.getElementById('expandKvmStageBtn').addEventListener('click', () => {
+      state.wideMode = !state.wideMode;
+      const kvmCol = document.getElementById('kvmStageColumn');
+      const dockCol = document.getElementById('controlDockColumn');
+      if (state.wideMode) {
+        kvmCol.className = 'xl:col-span-12 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col';
+        dockCol.className = 'xl:col-span-12 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col';
+        document.getElementById('noVncIframe').className = 'w-full h-[680px] border-0 bg-black';
+      } else {
+        kvmCol.className = 'xl:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col';
+        dockCol.className = 'xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col';
+        document.getElementById('noVncIframe').className = 'w-full h-[520px] border-0 bg-black';
+      }
+    });
+
+    document.getElementById('fullscreenKvmBtn').addEventListener('click', () => {
+      const area = document.getElementById('kvmContainerArea');
+      if (area.requestFullscreen) area.requestFullscreen();
+    });
+
+    // ==================== SDR PARSING & TABLE ====================
+    function parseAndRenderSdr(sdrText) {
+      const lines = sdrText.split('\n').map(l => l.trim()).filter(Boolean);
+      state.sdrList = lines.map(line => {
+        const parts = line.split('|').map(p => p.trim());
+        return {
+          name: parts[0] || line,
+          hexId: parts[1] || '-',
+          status: parts[2] || '-',
+          entity: parts[3] || '-',
+          reading: parts[4] || '-'
+        };
+      });
+      renderSdrTable();
+
+      const fanSensors = state.sdrList.filter(s => /fan|rpm/i.test(s.name) || /rpm/i.test(s.reading));
+      const fanBox = document.getElementById('liveFanSensorsBox');
+      if (fanSensors.length) {
+        fanBox.innerHTML = fanSensors.map(f => `
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-1">
+            <span class="text-white font-semibold">${f.name}</span>
+            <span class="text-emerald-300 font-bold">${f.reading} <span class="text-[10px] text-slate-400">[${f.status}]</span></span>
+          </div>
+        `).join('');
+        if (!document.getElementById('threshFanNameInput').value && fanSensors[0]) {
+          document.getElementById('threshFanNameInput').value = fanSensors[0].name;
+        }
+      } else {
+        fanBox.textContent = sdrText ? 'No RPM fan sensors reported in SDR.' : 'No SDR data loaded.';
+      }
+    }
+
+    function renderSdrTable() {
+      const q = (document.getElementById('sensorFilterInput').value || '').toLowerCase();
+      const tbody = document.getElementById('sdrTableBody');
+      const filtered = state.sdrList.filter(s => s.name.toLowerCase().includes(q) || s.reading.toLowerCase().includes(q));
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="py-6 text-center text-slate-500">No matching sensors.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(s => `
+        <tr class="hover:bg-slate-900/60">
+          <td class="py-1.5 px-3 font-semibold text-white">${s.name} <span class="text-slate-500 text-[10px]">(${s.hexId})</span></td>
+          <td class="py-1.5 px-2">
+            <span class="px-1.5 py-0.5 rounded text-[10px] ${s.status.toLowerCase() === 'ok' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-300'}">${s.status}</span>
+          </td>
+          <td class="py-1.5 px-3 text-right font-bold text-cyan-300">${s.reading}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('bmcConnectForm').addEventListener('submit', connectAndSyncBmc);
+    document.getElementById('refreshOverviewBtn').addEventListener('click', connectAndSyncBmc);
+    document.getElementById('sensorFilterInput').addEventListener('input', renderSdrTable);
+    document.getElementById('startKvmSessionBtn').addEventListener('click', launchJviewerSession);
+    document.getElementById('reloadIframeBtn').addEventListener('click', () => {
+      attachNoVncIframe();
+      showToast('Reloaded video stream');
+    });
+
+    // ==================== POWER, KEYS & PROBE ====================
+    document.getElementById('runProbeBtn').addEventListener('click', async () => {
+      const box = document.getElementById('probeResultsBox');
+      box.textContent = 'Probing BMC ports (80, 443, 7578, 5120, UDP 623)...';
+      const res = await callBridge({ action: 'network_probe' });
+      box.textContent = res.probe_report || res.stderr || 'Probe failed';
+    });
+
+    document.querySelectorAll('.power-action-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pwr = btn.getAttribute('data-power');
+        const res = await callBridge({ action: 'ipmitool', args: ['chassis', 'power', pwr] });
+        if (res.ok) {
+          showToast(`Chassis power ${pwr}: ${res.stdout}`);
+          setTimeout(connectAndSyncBmc, 1500);
+        } else {
+          showErrorBanner(`Chassis Power ${pwr.toUpperCase()} Failed`, res.stderr || 'Error');
+        }
+      });
+    });
+
+    document.getElementById('uidToggleBtn').addEventListener('click', async () => {
+      state.uidActive = !state.uidActive;
+      const arg = state.uidActive ? 'force' : '0';
+      const res = await callBridge({ action: 'ipmitool', args: ['chassis', 'identify', arg] });
+      if (res.ok) showToast(`Chassis UID LED: ${state.uidActive ? 'ON' : 'OFF'}`);
+    });
+
+    document.getElementById('openNoVncTabBtn').addEventListener('click', () => {
+      window.open(getNoVncUrl(), '_blank');
+    });
+
+    document.getElementById('downloadLiveJnlpBtn').addEventListener('click', async () => {
+      const res = await callBridge({ action: 'fetch_jnlp' });
+      if (res.ok && res.jnlp_xml) {
+        const blob = new Blob([res.jnlp_xml], { type: 'application/x-java-jnlp-file' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `jviewer-${getCreds().host}.jnlp`;
+        a.click();
+        showToast('Downloaded authenticated jviewer.jnlp');
+      } else {
+        showErrorBanner('Could Not Fetch jviewer.jnlp', res.stderr || 'Error');
+      }
+    });
+
+    document.querySelectorAll('.xkey-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const jvTarget = btn.getAttribute('data-jvclick');
+        if (jvTarget) {
+          await callBridge({ action: 'jviewer_click', id: jvTarget });
+        }
+        const key = btn.getAttribute('data-xkey');
+        if (key) {
+          const res = await callBridge({ action: 'xdotool_key', key });
+          if (res.ok) showToast(`Sent key ${key}`);
+        }
+      });
+    });
+
+    document.getElementById('sendXtypeBtn').addEventListener('click', async () => {
+      const text = document.getElementById('xtypeInput').value;
+      if (!text) return;
+      const res = await callBridge({ action: 'xdotool_type', text });
+      if (res.ok) showToast(`Typed ${text.length} chars into console`);
+    });
+
+    // ==================== FAN SPEED & PWM RAW CONTROL ====================
+    function buildFanRawArgs() {
+      const dutiesHex = state.fanZones.map(z => '0x' + z.duty.toString(16).padStart(2, '0'));
+      if (state.oemFanProfile === 'asrock_3a') {
+        const mode = state.fanAutoMode ? '0x00' : '0x01';
+        return ['raw', '0x3a', '0x01', mode, ...dutiesHex, '0x00'];
+      } else if (state.oemFanProfile === 'ami_30') {
+        if (state.fanAutoMode) return ['raw', '0x30', '0x45', '0x01', '0x00'];
+        return ['raw', '0x30', '0x70', '0x66', '0x01', '0x00', dutiesHex[0]];
+      } else if (state.oemFanProfile === 'asrock_d8') {
+        return ['raw', '0x3a', '0xd8', ...dutiesHex, '0x40', '0x40', '0x40'];
+      } else {
+        if (state.fanAutoMode) return ['raw', '0x30', '0x30', '0x01', '0x01'];
+        return ['raw', '0x30', '0x30', '0x02', '0xff', dutiesHex[0]];
+      }
+    }
+
+    function renderFanSliders() {
+      const container = document.getElementById('fanZoneSlidersContainer');
+      container.innerHTML = '';
+      state.fanZones.forEach((z, idx) => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between gap-3';
+        div.innerHTML = `
+          <span class="text-xs font-medium text-white w-36 truncate">${z.label}</span>
+          <input type="range" min="10" max="100" step="5" value="${z.duty}" data-fidx="${idx}" aria-label="${z.label}" class="fan-slider flex-1 accent-cyan-400 cursor-pointer" />
+          <span class="font-mono text-xs text-cyan-300 w-20 text-right">${z.duty}% (0x${z.duty.toString(16).padStart(2, '0')})</span>
+        `;
+        container.appendChild(div);
+      });
+
+      container.querySelectorAll('.fan-slider').forEach(sl => {
+        sl.addEventListener('input', (e) => {
+          const i = Number(e.target.getAttribute('data-fidx'));
+          state.fanAutoMode = false;
+          state.fanZones[i].duty = Number(e.target.value);
+          renderFanSliders();
+        });
+      });
+
+      const args = buildFanRawArgs();
+      document.getElementById('fanRawPreview').textContent = `ipmitool ${args.join(' ')}`;
+    }
+
+    document.getElementById('fanOemProfileSelect').addEventListener('change', (e) => {
+      state.oemFanProfile = e.target.value;
+      renderFanSliders();
+    });
+
+    async function executeFanRaw() {
+      const args = buildFanRawArgs();
+      const resBox = document.getElementById('fanExecResult');
+      resBox.classList.remove('hidden');
+      resBox.textContent = 'Sending raw fan command to BMC...';
+      const res = await callBridge({ action: 'ipmitool', args });
+      resBox.textContent = res.ok
+        ? `Success (exit 0): ${res.stdout || 'PWM updated on BMC'}`
+        : `Error: ${res.stderr}`;
+      if (res.ok) showToast('Applied raw fan PWM on BMC');
+    }
+
+    document.getElementById('applyFanRawBtn').addEventListener('click', executeFanRaw);
+
+    document.querySelectorAll('.fan-preset-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const val = btn.getAttribute('data-fanpreset');
+        if (val === 'auto') {
+          state.fanAutoMode = true;
+        } else {
+          state.fanAutoMode = false;
+          const num = Number(val);
+          state.fanZones.forEach(z => { z.duty = num; });
+        }
+        renderFanSliders();
+        await executeFanRaw();
+      });
+    });
+
+    document.getElementById('probeFanRawBtn').addEventListener('click', async () => {
+      const res = await callBridge({ action: 'ipmitool', args: ['sdr', 'type', 'Fan'] });
+      if (res.ok) {
+        document.getElementById('liveFanSensorsBox').textContent = res.stdout || 'No fan sensors returned';
+      }
+    });
+
+    document.getElementById('applyThreshFixBtn').addEventListener('click', async () => {
+      const fanName = document.getElementById('threshFanNameInput').value.trim();
+      const rpms = document.getElementById('threshFanRpmInput').value.trim().split(/\s+/);
+      if (!fanName || rpms.length < 3) {
+        showErrorBanner('Invalid Threshold Input', 'Provide the exact Fan Sensor Name and 3 RPM values (LNR LCR LNC), e.g. 100 150 200.');
+        return;
+      }
+      const res = await callBridge({ action: 'ipmitool', args: ['sensor', 'thresh', fanName, 'lower', rpms[0], rpms[1], rpms[2]] });
+      if (res.ok) showToast(`Updated lower thresholds for ${fanName}`);
+      else showErrorBanner('Threshold Update Failed', res.stderr || 'Error');
+    });
+
+    // ==================== BOOT ORDER & BIOS FLAGS ====================
+    document.querySelectorAll('.boot-dev-card').forEach(card => {
+      card.addEventListener('click', () => {
+        state.bootDevice = card.getAttribute('data-bootdev');
+        document.querySelectorAll('.boot-dev-card').forEach(c => {
+          const active = c.getAttribute('data-bootdev') === state.bootDevice;
+          c.className = active
+            ? 'boot-dev-card p-2.5 rounded-xl border border-cyan-500 bg-cyan-500/10 text-left'
+            : 'boot-dev-card p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left';
+        });
+      });
+    });
+
+    async function applyBootConfiguration(rebootAfter) {
+      const opts = [];
+      if (document.getElementById('bootFlagEfi').checked) opts.push('efiboot');
+      if (document.getElementById('bootFlagPersistent').checked) opts.push('persistent');
+      if (document.getElementById('bootFlagCmos').checked) opts.push('clear-cmos');
+      if (document.getElementById('bootFlagVerbose').checked) opts.push('biosverbosity=verbose');
+
+      const args = ['chassis', 'bootdev', state.bootDevice];
+      if (opts.length) args.push(`options=${opts.join(',')}`);
+
+      const res = await callBridge({ action: 'ipmitool', args });
+      if (!res.ok) {
+        showErrorBanner('Boot Device Override Failed', res.stderr || 'Error');
+        return;
+      }
+      showToast(`Boot override set to ${state.bootDevice}`);
+      const paramRes = await callBridge({ action: 'ipmitool', args: ['chassis', 'bootparam', 'get', '5'] });
+      if (paramRes.ok) document.getElementById('liveBootParamOutput').textContent = paramRes.stdout;
+
+      if (rebootAfter) {
+        await callBridge({ action: 'ipmitool', args: ['chassis', 'power', 'reset'] });
+        showToast('Sent chassis power reset');
+      }
+    }
+
+    document.getElementById('applyBootBtn').addEventListener('click', () => applyBootConfiguration(false));
+    document.getElementById('applyBootRebootBtn').addEventListener('click', () => applyBootConfiguration(true));
+
+    document.getElementById('readBootParamBtn').addEventListener('click', async () => {
+      const res = await callBridge({ action: 'ipmitool', args: ['chassis', 'bootparam', 'get', '5'] });
+      document.getElementById('liveBootParamOutput').textContent = res.stdout || res.stderr || 'No output';
+    });
+
+    document.querySelectorAll('.ac-policy-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const policy = btn.getAttribute('data-policy');
+        const res = await callBridge({ action: 'ipmitool', args: ['chassis', 'policy', policy] });
+        if (res.ok) showToast(`AC Power Policy set to ${policy}`);
+        else showErrorBanner('Failed to Set Power Policy', res.stderr);
+      });
+    });
+
+    // ==================== SDR POLLING, RAW STUDIO & SEL ====================
+    document.getElementById('pollSdrBtn').addEventListener('click', async () => {
+      const res = await callBridge({ action: 'ipmitool', args: ['sdr', 'elist', 'full'] });
+      if (res.ok) {
+        parseAndRenderSdr(res.stdout);
+        showToast(`Loaded ${state.sdrList.length} live sensors`);
+      } else {
+        showErrorBanner('SDR Poll Failed', res.stderr);
+      }
+    });
+
+    document.getElementById('rawPresetSelect').addEventListener('change', (e) => {
+      document.getElementById('customIpmiInput').value = e.target.value;
+    });
+
+    document.getElementById('customIpmiForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawArgs = document.getElementById('customIpmiInput').value.trim().split(/\s+/).filter(Boolean);
+      if (!rawArgs.length) return;
+      document.getElementById('customIpmiOutput').textContent = 'Running ipmitool ' + rawArgs.join(' ') + '...';
+      const res = await callBridge({ action: 'ipmitool', args: rawArgs });
+      document.getElementById('customIpmiOutput').textContent =
+        `$ ${res.cmd || 'ipmitool ' + rawArgs.join(' ')}\n\n` + (res.stdout || res.stderr || '(Empty response)');
+    });
+
+    document.getElementById('refreshSelBtn').addEventListener('click', async () => {
+      const res = await callBridge({ action: 'ipmitool', args: ['sel', 'elist'] });
+      document.getElementById('selLogOutput').textContent = res.stdout || res.stderr || 'No SEL entries';
+    });
+
+    document.getElementById('clearSelBtn').addEventListener('click', async () => {
+      const res = await callBridge({ action: 'ipmitool', args: ['sel', 'clear'] });
+      if (res.ok) {
+        document.getElementById('selLogOutput').textContent = res.stdout || 'SEL cleared.';
+        showToast('System Event Log cleared');
+      }
+    });
+
+    // ==================== CLI DRAWER ====================
+    document.getElementById('quickCliDrawerBtn').addEventListener('click', () => {
+      document.getElementById('cliHistoryPre').textContent = state.cliHistory.join('\n\n') || 'No commands executed yet.';
+      document.getElementById('cliDrawerModal').classList.remove('hidden');
+    });
+    document.getElementById('closeCliDrawerBtn').addEventListener('click', () => {
+      document.getElementById('cliDrawerModal').classList.add('hidden');
+    });
+
+    window.addEventListener('load', () => {
+      renderFanSliders();
+      if (document.getElementById('bmcHostInput').value.trim()) {
+        connectAndSyncBmc();
+      }
+    });
+  </script>
+</body>
+</html>

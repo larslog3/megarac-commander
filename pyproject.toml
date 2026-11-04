@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "megarac-commander"
+version = "1.0.0"
+description = "Unified HTML5 iKVM & IPMI 2.0 Control Center for AMI MegaRAC SP (FW 7.17.00)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "MegaRAC Commander Contributors" }]
+keywords = ["ipmi", "megarac", "ikvm", "jviewer", "bmc", "homelab"]
+
+[project.scripts]
+megarac-commander = "megarac_commander.bridge_server:main"

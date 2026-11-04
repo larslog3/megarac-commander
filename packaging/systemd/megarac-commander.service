@@ -1,0 +1,13 @@
+[Unit]
+Description=MegaRAC Commander HTML5 iKVM & IPMI 2.0 Bridge Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/megarac-commander
+ExecStart=/usr/bin/python3 /opt/megarac-commander/bridge_server.py --bind 0.0.0.0 --port 8765
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,33 @@
+# Maintainer: MegaRAC Commander Contributors
+pkgname=megarac-commander
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Unified HTML5 iKVM & IPMI 2.0 Control Center for AMI MegaRAC SP (FW 7.17.00)"
+arch=('any')
+url="https://github.com/YOUR_USERNAME/megarac-commander"
+license=('MIT')
+depends=('python' 'ipmitool' 'curl')
+optdepends=(
+  'jdk8-openjdk: Run native JViewer.jar with Swing Reflection Bridge'
+  'icedtea-web: WebStart fallback support'
+  'xorg-server-xvfb: Headless X11 display for iKVM'
+  'x11vnc: VNC bridge for iKVM'
+  'novnc: HTML5 canvas client for iKVM'
+  'websockify: WebSocket proxy for iKVM'
+  'fluxbox: Borderless window manager'
+  'xdotool: Keyboard macro injection'
+)
+source=("megarac-commander-${pkgver}-linux-any.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -dm755 "${pkgdir}/opt/megarac-commander"
+  install -Dm644 index.html bridge_server.py ModernJViewerBridge.java "${pkgdir}/opt/megarac-commander/"
+  install -Dm644 packaging/systemd/megarac-commander.service "${pkgdir}/usr/lib/systemd/system/megarac-commander.service"
+  install -dm755 "${pkgdir}/usr/bin"
+  cat << 'EOF' > "${pkgdir}/usr/bin/megarac-commander"
+#!/usr/bin/env bash
+exec python3 /opt/megarac-commander/bridge_server.py "$@"
+EOF
+  chmod 0755 "${pkgdir}/usr/bin/megarac-commander"
+}

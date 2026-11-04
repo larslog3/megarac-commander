@@ -1,0 +1,8 @@
+services:
+  megarac-commander:
+    build: .
+    container_name: megarac-commander
+    ports:
+      - "8765:8765"
+      - "6080:6080"
+    restart: unless-stopped
