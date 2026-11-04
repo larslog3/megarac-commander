@@ -3,7 +3,7 @@ Version:        1.0.0
 Release:        1%{?dist}
 Summary:        Unified HTML5 iKVM & IPMI 2.0 Control Center for AMI MegaRAC SP
 License:        MIT
-URL:            https://github.com/YOUR_USERNAME/megarac-commander
+URL:            https://github.com/larslog3/megarac-commander
 BuildArch:      noarch
 Requires:       python3, ipmitool, curl
 

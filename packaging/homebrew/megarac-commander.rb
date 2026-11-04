@@ -1,7 +1,7 @@
 class MegaracCommander < Formula
   desc "Unified HTML5 iKVM & IPMI 2.0 Control Center for AMI MegaRAC SP"
-  homepage "https://github.com/YOUR_USERNAME/megarac-commander"
-  url "https://github.com/YOUR_USERNAME/megarac-commander/releases/download/v1.0.0/megarac-commander-1.0.0-linux-any.tar.gz"
+  homepage "https://github.com/larslog3/megarac-commander"
+  url "https://github.com/larslog3/megarac-commander/releases/download/v1.0.0/megarac-commander-1.0.0-linux-any.tar.gz"
   version "1.0.0"
   license "MIT"
 

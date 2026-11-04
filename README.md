@@ -59,6 +59,6 @@ git init
 git add .
 git commit -m "Initial release of MegaRAC Commander v1.0.0"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/megarac-commander.git
+git remote add origin https://github.com/larslog3/megarac-commander.git
 git push -u origin main
 ```
